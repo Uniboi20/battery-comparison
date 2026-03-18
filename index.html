@@ -1013,6 +1013,21 @@
   Data sourced from Amazon listings · Scores recalculate live based on your weights · Last updated from spreadsheet export
 </footer>
 
+<!-- Debug banner -->
+<div id="debugBanner" style="display:none;position:fixed;top:60px;left:0;right:0;z-index:600;padding:10px 24px;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.05em;border-bottom:1px solid rgba(255,255,255,0.1);"></div>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay" style="display:none;position:fixed;inset:0;background:rgba(13,15,20,0.85);z-index:500;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:0.15em;animation:pulse 1.2s ease-in-out infinite;">LOADING FROM GOOGLE SHEETS…</div>
+  <div style="width:200px;height:2px;background:var(--border);border-radius:2px;overflow:hidden;">
+    <div style="height:100%;width:40%;background:var(--accent);border-radius:2px;animation:slide 1s ease-in-out infinite;"></div>
+  </div>
+</div>
+<style>
+  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+  @keyframes slide { 0%{transform:translateX(-100%)} 100%{transform:translateX(350%)} }
+</style>
+
 <script>
 // ─────────────────────────────────────────────────────────────────────
 // DATA SOURCE CONFIGURATION
@@ -1093,7 +1108,7 @@ function rowToStation(cols) {
 }
 
 function loadFromCSV(csvText) {
-  const lines = csvText.split('\n');
+  const lines = csvText.split(/\r\n|\n|\r/);
   return lines.slice(1).map(parseCSVRow).map(rowToStation).filter(Boolean);
 }
 
@@ -1131,6 +1146,8 @@ function showDebugBanner(msg, isError) {
   b.style.color = isError ? '#ff4d6d' : '#00e5a0';
   if (!isError) setTimeout(() => { b.style.display = 'none'; }, 5000);
 }
+
+document.addEventListener('DOMContentLoaded', function() {
 
 if (SHEET_CSV_URL) {
   document.getElementById('loadingOverlay').style.display = 'flex';
@@ -1172,6 +1189,8 @@ if (SHEET_CSV_URL) {
   showDataBadge('fallback');
   init(FALLBACK_DATA);
 }
+
+}); // end DOMContentLoaded
 
 
 function calcScore(d) {
@@ -1469,19 +1488,5 @@ document.querySelectorAll('.toggle-btn').forEach(btn => {
 // ─── INIT is now handled by init() called after data loads ───
 </script>
 
-<!-- Debug banner (auto-hides after 5s on success, stays on error) -->
-<div id="debugBanner" style="display:none;position:fixed;top:60px;left:0;right:0;z-index:600;padding:10px 24px;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.05em;border-bottom:1px solid rgba(255,255,255,0.1);"></div>
-
-<!-- Loading overlay -->
-<div id="loadingOverlay" style="display:none;position:fixed;inset:0;background:rgba(13,15,20,0.85);z-index:500;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
-  <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);letter-spacing:0.15em;animation:pulse 1.2s ease-in-out infinite;">LOADING FROM GOOGLE SHEETS…</div>
-  <div style="width:200px;height:2px;background:var(--border);border-radius:2px;overflow:hidden;">
-    <div style="height:100%;width:40%;background:var(--accent);border-radius:2px;animation:slide 1s ease-in-out infinite;"></div>
-  </div>
-</div>
-<style>
-  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
-  @keyframes slide { 0%{transform:translateX(-100%)} 100%{transform:translateX(350%)} }
-</style>
 </body>
 </html>
