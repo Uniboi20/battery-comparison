@@ -1086,20 +1086,25 @@ function parseBool(v) {
   return s === 'TRUE' || s === '1' || s === 'YES';
 }
 
+function parseNum(v) {
+  // Strip $, commas, spaces then parse — handles "$1,234.56" -> 1234.56
+  return parseFloat(String(v || '').replace(/[$,\s]/g, ''));
+}
+
 function rowToStation(cols) {
   const brand = cols[COL.brand]?.trim();
   if (!brand) return null;
-  const price = parseFloat(cols[COL.price]);
-  const capacity = parseFloat(cols[COL.capacity]);
+  const price = parseNum(cols[COL.price]);
+  const capacity = parseNum(cols[COL.capacity]);
   if (isNaN(price) || isNaN(capacity)) return null;
   return {
     brand, price, capacity,
     model:       cols[COL.model]?.trim() || '',
     url:         (cols[COL.url] || '').trim().replace(/^"|"$/g,''),
-    l2Outlets:   parseInt(cols[COL.l2]) || 0,
-    outlets120v: parseInt(cols[COL.outlets120v]) || 0,
-    usbOutlets:  parseInt(cols[COL.usb]) || 0,
-    peakPower:   parseFloat(cols[COL.peakPower]) || 0,
+    l2Outlets:   parseNum(cols[COL.l2]) || 0,
+    outlets120v: parseNum(cols[COL.outlets120v]) || 0,
+    usbOutlets:  parseNum(cols[COL.usb]) || 0,
+    peakPower:   parseNum(cols[COL.peakPower]) || 0,
     expandable:  parseBool(cols[COL.expandable]),
     appSupport:  parseBool(cols[COL.app]),
     jumpStarter: parseBool(cols[COL.jump]),
@@ -1158,18 +1163,36 @@ if (SHEET_CSV_URL) {
     })
     .then(csv => {
       // Show first 200 chars of response for debugging
-      const preview = csv.substring(0, 200).replace(/\n/g, ' | ');
-      console.log('CSV preview:', preview);
+      // Detailed diagnostics
+      const totalLen = csv.length;
+      const crCount = (csv.match(/\r/g) || []).length;
+      const lfCount = (csv.match(/\n/g) || []).length;
+      const crlfCount = (csv.match(/\r\n/g) || []).length;
+      const charCodes = Array.from(csv.substring(0, 5)).map(c => c.charCodeAt(0));
+      const preview200 = csv.substring(0, 200);
+      const preview400 = csv.substring(200, 400);
+
+      const diagMsg = 'len=' + totalLen + ' CR=' + crCount + ' LF=' + lfCount + ' CRLF=' + crlfCount + ' firstChars=' + charCodes.join(',');
+      console.log('CSV diagnostics:', diagMsg);
+      console.log('CSV first 200:', preview200);
+      console.log('CSV next 200:', preview400);
 
       // Check if Google returned an HTML error page instead of CSV
       if (csv.trim().startsWith('<')) {
-        throw new Error('Got HTML instead of CSV — Apps Script may need re-authorization. Preview: ' + preview.substring(0, 100));
+        throw new Error('Got HTML instead of CSV. ' + diagMsg);
       }
 
+      // Try all possible splits and report which one finds rows
+      const splitN = csv.split('\n');
+      const splitR = csv.split('\r');
+      const splitCRLF = csv.split('\r\n');
+      const splitRegex = csv.split(/\r\n|\n|\r/);
+      console.log('Split results - \\n:', splitN.length, '\\r:', splitR.length, '\\r\\n:', splitCRLF.length, 'regex:', splitRegex.length);
+
       const stations = loadFromCSV(csv);
-      console.log('Parsed stations:', stations.length, stations[0]);
 
       if (stations.length < 5) {
+        const preview = csv.substring(0, 200).replace(/\r\n|\n|\r/g, ' | ');
         throw new Error('Only parsed ' + stations.length + ' rows. CSV preview: ' + preview);
       }
 
