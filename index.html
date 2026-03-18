@@ -1116,19 +1116,54 @@ function init(stations) {
   applyFilters();
 }
 
+let filtered = [];
+let sortField = 'valueScore';
+let sortDir = -1;
+let filters = { search: '', brand: '', minPrice: null, maxPrice: null, minCap: null, maxCap: null, expandable: false, appSupport: false, jumpStarter: false, hasL2: false };
+let compareSet = new Set();
+
+function showDebugBanner(msg, isError) {
+  const b = document.getElementById('debugBanner');
+  if (!b) return;
+  b.textContent = msg;
+  b.style.display = 'block';
+  b.style.background = isError ? '#3a0a0a' : '#0a2a1a';
+  b.style.color = isError ? '#ff4d6d' : '#00e5a0';
+  if (!isError) setTimeout(() => { b.style.display = 'none'; }, 5000);
+}
+
 if (SHEET_CSV_URL) {
   document.getElementById('loadingOverlay').style.display = 'flex';
   fetch(SHEET_CSV_URL)
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP error ' + r.status);
+      return r.text();
+    })
     .then(csv => {
+      // Show first 200 chars of response for debugging
+      const preview = csv.substring(0, 200).replace(/\n/g, ' | ');
+      console.log('CSV preview:', preview);
+
+      // Check if Google returned an HTML error page instead of CSV
+      if (csv.trim().startsWith('<')) {
+        throw new Error('Got HTML instead of CSV — Apps Script may need re-authorization. Preview: ' + preview.substring(0, 100));
+      }
+
       const stations = loadFromCSV(csv);
-      if (stations.length < 5) throw new Error('Too few rows: ' + stations.length);
+      console.log('Parsed stations:', stations.length, stations[0]);
+
+      if (stations.length < 5) {
+        throw new Error('Only parsed ' + stations.length + ' rows. CSV preview: ' + preview);
+      }
+
       showDataBadge('sheets');
+      showDebugBanner('✓ Loaded ' + stations.length + ' stations from Google Sheets', false);
       document.getElementById('loadingOverlay').style.display = 'none';
       init(stations);
     })
     .catch(err => {
-      console.warn('Google Sheets load failed, using built-in data:', err);
+      console.error('Sheets load failed:', err);
+      showDebugBanner('⚠ Sheets load failed: ' + err.message + ' — using built-in data', true);
       showDataBadge('fallback');
       document.getElementById('loadingOverlay').style.display = 'none';
       init(FALLBACK_DATA);
@@ -1138,11 +1173,6 @@ if (SHEET_CSV_URL) {
   init(FALLBACK_DATA);
 }
 
-let filtered = [];
-let sortField = 'valueScore';
-let sortDir = -1;
-let filters = { search: '', brand: '', minPrice: null, maxPrice: null, minCap: null, maxCap: null, expandable: false, appSupport: false, jumpStarter: false, hasL2: false };
-let compareSet = new Set();
 
 function calcScore(d) {
   // Capacity: (Wh / benchmarkWh)^exp * valueAtBenchmark
@@ -1438,6 +1468,9 @@ document.querySelectorAll('.toggle-btn').forEach(btn => {
 
 // ─── INIT is now handled by init() called after data loads ───
 </script>
+
+<!-- Debug banner (auto-hides after 5s on success, stays on error) -->
+<div id="debugBanner" style="display:none;position:fixed;top:60px;left:0;right:0;z-index:600;padding:10px 24px;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.05em;border-bottom:1px solid rgba(255,255,255,0.1);"></div>
 
 <!-- Loading overlay -->
 <div id="loadingOverlay" style="display:none;position:fixed;inset:0;background:rgba(13,15,20,0.85);z-index:500;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
